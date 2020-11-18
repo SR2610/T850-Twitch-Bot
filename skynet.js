@@ -2,6 +2,11 @@ var ComfyJS = require("comfy.js");
 
 let huejay = require('huejay');
 
+const OBSWebSocket = require('obs-websocket-js');
+
+
+const obs = new OBSWebSocket();
+
 
 let client = new huejay.Client({
   host: '192.168.1.225',
@@ -31,6 +36,24 @@ huejay.discover()
 
 
 
+obs.connect({
+  address: 'localhost:4444',
+  password: '$up3rSecretP@ssw0rd'
+})
+  .then(() => {
+    console.log(`Success! We're connected & authenticated.`);
+  
+  })
+  .catch(err => { // Promise convention dicates you have a catch on every chain.
+    console.log(err);
+  });
+
+
+// You must add this handler to avoid uncaught exceptions.
+obs.on('error', err => {
+  console.error('socket error:', err);
+});
+
 ComfyJS.onChat = (user, message, flags, self, extra) => {
 
   if (flags.customReward) {
@@ -51,15 +74,16 @@ ComfyJS.onChat = (user, message, flags, self, extra) => {
       case REWARD_LIGHTS_PURPLE:
         SetLightToScene(PURPLE);
         break;
-        case REWARD_LIGHTS_WHITE:
-          SetLightToScene(WHITE);
-          break
+      case REWARD_LIGHTS_WHITE:
+        SetLightToScene(WHITE);
+        break
       case REWARD_LIGHTS_OFF:
-        TurnOffLights(); 
+        TurnOffLights();
         break;
-        case REWARD_DAB:
-           console.log("DAB");
-          break
+      case REWARD_DAB:
+        console.log("DAB");
+        DabCamera();
+        break
 
     }
 
@@ -68,14 +92,14 @@ ComfyJS.onChat = (user, message, flags, self, extra) => {
 
 ComfyJS.Init("SR2610");
 
-client.scenes.getAll()
+/*client.scenes.getAll()
   .then(scenes => {
     for (let scene of scenes) {
       console.log(`Scene [${scene.id}]: ${scene.name}`);
       console.log('  Lights:', scene.lightIds.join(', '));
       console.log();
     }
-  });
+  });*/
 
 
 
@@ -115,3 +139,24 @@ function TurnOffLights() {
     });
 
 }
+
+
+
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function DabCamera() {
+  var sceneName = obs.send('GetCurrentScene');
+  obs.send('SetCurrentScene', {
+    'scene-name': 'DabCamera'
+  });
+   await sleep(4000)
+  
+  console.log((await sceneName).name);
+  obs.send('SetCurrentScene', {
+    'scene-name': (await sceneName).name
+  });
+}
+

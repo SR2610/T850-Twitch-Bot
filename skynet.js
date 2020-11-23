@@ -1,17 +1,29 @@
-var ComfyJS = require("comfy.js");
+require('dotenv').config();
 
 let huejay = require('huejay');
 
 const OBSWebSocket = require('obs-websocket-js');
-
-
 const obs = new OBSWebSocket();
+
+const { ApiClient } = require('twitch');
+const { StaticAuthProvider } = require('twitch-auth');
+const { PubSubClient } = require('twitch-pubsub-client');
+
+
+const clientId = process.env.TWITCH_CLIENT_ID;
+const accessToken = process.env.TWITCH_KEY;
+const authProvider = new StaticAuthProvider(clientId, accessToken);
+const apiClient = new ApiClient({ authProvider });
+
+const pubSubClient = new PubSubClient();
+const userId = registerListener().then(()=>{getListener();});
+
 
 
 let client = new huejay.Client({
-  host: '192.168.1.225',
+  host: process.env.HUE_IP,
   port: 80,               // Optional
-  username: 'zjTQgHyGrICuXIFx3ANljgQkVVnQlvO9ZlQCPJ9d', // Optional
+  username: process.env.HUE_USER, // Optional
   timeout: 15000,            // Optional, timeout in milliseconds (15000 is the default)
 });
 
@@ -20,101 +32,92 @@ const GROUP_ID = 9, RED = 'GgVtnAjJXCzxZyy', BLUE = 'jbtuQnGc7sIYznl', GREEN = '
 
 //REWARD IDS
 const REWARD_LIGHTS_RED = '6b6161cb-8d58-4996-a9be-d85ae77c169e', REWARD_LIGHTS_BLUE = '768c1085-8e0e-47f9-ad26-540b844c85d0',
-  REWARD_LIGHTS_GREEN = 'ab01dbb0-aff5-495a-9a9f-9209cf7533c0', REWARD_LIGHTS_PINK = 'fc8fd880-56c8-4a49-831b-132b7882de6a',
-  REWARD_LIGHTS_PURPLE = 'a2f3bf4b-dd63-4732-b4eb-fde790fe78ff', REWARD_LIGHTS_WHITE = '8a019f0a-b6d3-4dac-a0a2-967e86c52d53',
-  REWARD_LIGHTS_OFF = '6f986e2e-e1b1-4d0b-8496-986091bef7be', REWARD_DAB = '8488c296-5eee-40a2-a4eb-eefec9a3d5c8';;
+      REWARD_LIGHTS_GREEN = 'ab01dbb0-aff5-495a-9a9f-9209cf7533c0', REWARD_LIGHTS_PINK = 'fc8fd880-56c8-4a49-831b-132b7882de6a',
+      REWARD_LIGHTS_PURPLE = 'a2f3bf4b-dd63-4732-b4eb-fde790fe78ff', REWARD_LIGHTS_WHITE = '8a019f0a-b6d3-4dac-a0a2-967e86c52d53',
+      REWARD_LIGHTS_OFF = '6f986e2e-e1b1-4d0b-8496-986091bef7be', REWARD_DAB = '8488c296-5eee-40a2-a4eb-eefec9a3d5c8';;
 
 huejay.discover()
   .then(bridges => {
     for (let bridge of bridges) {
-      console.log(`Id: ${bridge.id}, IP: ${bridge.ip}`);
+      console.log(`"Hue Bridge Discovered: " ID: ${bridge.id}, IP: ${bridge.ip}`);
     }
   })
   .catch(error => {
-    console.log(`An error occurred: ${error.message}`);
+    console.log(`An error occurred when finding hue bridges: ${error.message}`);
   });
 
 
 
 obs.connect({
-  address: 'localhost:4444',
-  password: '$up3rSecretP@ssw0rd'
+  address: process.env.OBS_IP,
+  password: process.env.OBS_PASSWORD
 })
   .then(() => {
-    console.log(`Success! We're connected & authenticated.`);
-  
+    console.log(`Connected and Authenticated with OBS!`);
+
   })
-  .catch(err => { // Promise convention dicates you have a catch on every chain.
-    console.log(err);
+  .catch(err => {
+    console.log("Unable to connect with OBS-Websocket.  Ensure that OBS is running first!")
+    //console.log(err); //Don't always need error logged.  It is usually just obs not running that causes it.
   });
 
 
-// You must add this handler to avoid uncaught exceptions.
-obs.on('error', err => {
+obs.on('error', err => { //Catch other obs websocket errors
   console.error('socket error:', err);
 });
 
-ComfyJS.onChat = (user, message, flags, self, extra) => {
 
-  if (flags.customReward) {
-    console.log("Reward Redeemed");
-    switch (extra.customRewardId) {
-      case REWARD_LIGHTS_RED:
-        SetLightToScene(RED);
-        break;
-      case REWARD_LIGHTS_BLUE:
-        SetLightToScene(BLUE);
-        break;
-      case REWARD_LIGHTS_GREEN:
-        SetLightToScene(GREEN);
-        break;
-      case REWARD_LIGHTS_PINK:
-        SetLightToScene(PINK);
-        break;
-      case REWARD_LIGHTS_PURPLE:
-        SetLightToScene(PURPLE);
-        break;
-      case REWARD_LIGHTS_WHITE:
-        SetLightToScene(WHITE);
-        break
-      case REWARD_LIGHTS_OFF:
-        TurnOffLights();
-        break;
-      case REWARD_DAB:
-        console.log("DAB");
-        DabCamera();
-        break
-
-    }
-
-  }
+async function registerListener() {
+  return await pubSubClient.registerUserListener(apiClient);
 }
 
-ComfyJS.Init("SR2610");
 
-/*client.scenes.getAll()
-  .then(scenes => {
-    for (let scene of scenes) {
-      console.log(`Scene [${scene.id}]: ${scene.name}`);
-      console.log('  Lights:', scene.lightIds.join(', '));
-      console.log();
-    }
-  });*/
+async function getListener() {
+  return  await pubSubClient.onRedemption(await pubSubClient.registerUserListener(apiClient), (message) => {
+      console.log("REWARD HAS BEEN REDEEMED");
+      switch (message.rewardId) {
+        case REWARD_LIGHTS_RED:
+          setLightToScene(RED);
+          break;
+        case REWARD_LIGHTS_BLUE:
+          setLightToScene(BLUE);
+          break;
+        case REWARD_LIGHTS_GREEN:
+          setLightToScene(GREEN);
+          break;
+        case REWARD_LIGHTS_PINK:
+          setLightToScene(PINK);
+          break;
+        case REWARD_LIGHTS_PURPLE:
+          setLightToScene(PURPLE);
+          break;
+        case REWARD_LIGHTS_WHITE:
+          setLightToScene(WHITE);
+          break
+        case REWARD_LIGHTS_OFF:
+          turnOffLights();
+          break;
+        case REWARD_DAB:
+          switchToDabCamera();
+          break
+  
+      }
+  });
+}
 
 
-
-function SetLightToScene(scene) {
+function setLightToScene(sceneID) {
   client.groups.getById(GROUP_ID)
     .then(group => {
 
 
       group.on = true;
-      group.scene = scene;
+      group.scene = sceneID;
 
       return client.groups.save(group);
     })
     .then(group => {
-      console.log(`Group [${group.id}] was saved`);
+      //console.log(`Group [${group.id}] was saved`);
     })
     .catch(error => {
       console.log(error.stack);
@@ -122,7 +125,7 @@ function SetLightToScene(scene) {
 
 }
 
-function TurnOffLights() {
+function turnOffLights() {
   client.groups.getById(GROUP_ID)
     .then(group => {
 
@@ -132,7 +135,7 @@ function TurnOffLights() {
       return client.groups.save(group);
     })
     .then(group => {
-      console.log(`Group [${group.id}] was saved`);
+     // console.log(`Group [${group.id}] was saved`);
     })
     .catch(error => {
       console.log(error.stack);
@@ -147,16 +150,26 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function DabCamera() {
+async function switchToDabCamera() {
   var sceneName = obs.send('GetCurrentScene');
   obs.send('SetCurrentScene', {
     'scene-name': 'DabCamera'
   });
-   await sleep(4000)
-  
+  await sleep(4000)
+
   console.log((await sceneName).name);
   obs.send('SetCurrentScene', {
     'scene-name': (await sceneName).name
   });
 }
 
+function debugHue() {//used as a debug function to get hue scenes
+  client.scenes.getAll()
+    .then(scenes => {
+      for (let scene of scenes) {
+        console.log(`Scene [${scene.id}]: ${scene.name}`);
+        console.log('  Lights:', scene.lightIds.join(', '));
+        console.log();
+      }
+    });
+}

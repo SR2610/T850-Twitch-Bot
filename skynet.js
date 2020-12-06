@@ -18,6 +18,7 @@ const apiClient = new ApiClient({ authProvider });
 const pubSubClient = new PubSubClient();
 
 var userId;
+var client;
 
 
 //LIGHTS
@@ -36,7 +37,7 @@ function init() {
 
   userId = registerListener().then(() => { getListener(); });
 
-  let client = new huejay.Client({
+  client = new huejay.Client({
     host: process.env.HUE_IP,
     port: 80,
     username: process.env.HUE_USER,

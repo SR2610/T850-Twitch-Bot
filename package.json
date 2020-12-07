@@ -11,8 +11,9 @@
     "obs-websocket-js": "^4.0.2",
     "tesjs": "^0.0.3",
     "tmi.js": "^1.5.0",
-    "twitch": "^4.3.0",
-    "twitch-pubsub-client": "^4.3.0"
+    "twitch": "^4.3.5",
+    "twitch-pubsub-client": "^4.3.5",
+    "ws": "^7.4.1"
   },
   "devDependencies": {},
   "scripts": {

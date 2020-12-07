@@ -8,6 +8,7 @@ const obs = new OBSWebSocket();
 const { ApiClient } = require('twitch');
 const { StaticAuthProvider } = require('twitch-auth');
 const { PubSubClient } = require('twitch-pubsub-client');
+const { ChatClient } = require('twitch-chat-client');
 const WebSocket = require('ws')
 
 
@@ -16,7 +17,7 @@ const clientId = process.env.TWITCH_CLIENT_ID;
 const accessToken = process.env.TWITCH_KEY;
 const authProvider = new StaticAuthProvider(clientId, accessToken);
 const apiClient = new ApiClient({ authProvider });
-
+const chatClient = new ChatClient(authProvider, { channels: [process.env.TWITCH_USER] });
 const pubSubClient = new PubSubClient();
 
 const wss = new WebSocket.Server({ port: 8080 })
@@ -45,6 +46,7 @@ init();
 function init() {
 
   userId = registerListener().then(() => { getListener(); });
+  chatClient.connect().then(()=>{listenToChatMessages();});
   client = new huejay.Client({
     host: process.env.HUE_IP,
     port: 80,
@@ -141,6 +143,38 @@ async function getListener() {
 
     }
   });
+}
+
+
+async function listenToChatMessages(){
+
+  await chatClient.onMessage(async (channel, user, message, msg) => {
+    if (!message.startsWith('!'))
+    return;
+    const args = message.slice('!'.length).trim().split(/ +/);
+        const commandName = args.shift().toLowerCase();
+
+        switch(commandName){
+          default:
+            chatClient.say(channel, `@${user} We don't have any commands set up yet! Sorry.`);
+            break;
+          }
+  });
+  
+  await chatClient.onSub(async(channel, user,subInfo,msg)=>{
+      console.log("SOMEONE SUBSCRIBED");
+  });
+
+  await chatClient.onSubGift(async(channel, user,subInfo,msg)=>{
+    console.log("SOMEONE GIFTED A SUB");
+
+  });
+
+  await chatClient.onRaid(async(channel, user,raidInfo,msg)=>{
+    console.log("SOMEONE RAIDED");
+
+  });
+
 }
 
 

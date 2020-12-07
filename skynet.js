@@ -30,18 +30,21 @@ var client;
 const GROUP_ID = 9, RED = 'GgVtnAjJXCzxZyy', BLUE = 'jbtuQnGc7sIYznl', GREEN = 'BAyhtEu6aSNvqKj', PINK = 'lEdhmxQVq9WKdRj', PURPLE = 'c4F8p8eB4CSgEXc', WHITE = 'DLa-2W2ecctaccs';
 
 //REWARD IDS
-const REWARD_LIGHTS_RED = '6b6161cb-8d58-4996-a9be-d85ae77c169e', REWARD_LIGHTS_BLUE = '768c1085-8e0e-47f9-ad26-540b844c85d0',
-  REWARD_LIGHTS_GREEN = 'ab01dbb0-aff5-495a-9a9f-9209cf7533c0', REWARD_LIGHTS_PINK = 'fc8fd880-56c8-4a49-831b-132b7882de6a',
-  REWARD_LIGHTS_PURPLE = 'a2f3bf4b-dd63-4732-b4eb-fde790fe78ff', REWARD_LIGHTS_WHITE = '8a019f0a-b6d3-4dac-a0a2-967e86c52d53',
-  REWARD_LIGHTS_OFF = '6f986e2e-e1b1-4d0b-8496-986091bef7be', REWARD_DAB = 'ae1faa37-fead-4336-bd42-d610eda62ed9';
-
+const REWARDS = {
+  RED: 'd70e714c-fb41-469c-89f7-deb500f93ce7',
+  BLUE: '2e6eb414-5dc6-4c7f-a363-7064d7ebd50a',
+  GREEN: '7c0da6e9-8648-4dba-b5fe-b18a28c0643b',
+  PURPLE: '1774c5dc-243b-4cba-8ce6-97d8d256ac57',
+  WHITE: 'b2e45da1-294d-4463-b5f9-c77ebe197707',
+  OFF: '9afdeaf9-c6b2-4910-be90-976b1b66c103',
+  DAB: 'ae1faa37-fead-4336-bd42-d610eda62ed9'
+}
 
 init();
 
 function init() {
 
   userId = registerListener().then(() => { getListener(); });
-
   client = new huejay.Client({
     host: process.env.HUE_IP,
     port: 80,
@@ -81,12 +84,21 @@ function init() {
   wss.on('connection', (ws) => {
     ws.on('message', (message) => {
       var objectValue = JSON.parse(message);
-      if(objectValue["event"]=="keyDown"){
+      if (objectValue["event"] == "keyDown") {
         var payloadData = (((objectValue["payload"])["settings"])["id"]);
-
-        switch(payloadData){
-          default:
+        switch (payloadData) {
+          case "toggleAllRewards":
+            toggleAllRewards();
             break;
+          case "enableAllRewards":
+            enableDisableAllRewards(true);
+            break;
+          case "disableAllRewards":
+            enableDisableAllRewards(false);
+            break;
+            default:
+              console.log(payloadData);
+              break;
         }
 
       }
@@ -105,30 +117,27 @@ async function registerListener() {
 async function getListener() {
   return await pubSubClient.onRedemption(await pubSubClient.registerUserListener(apiClient), (message) => {
     switch (message.rewardId) {
-      case REWARD_LIGHTS_RED:
+      case REWARDS.RED:
         setLightToScene(RED);
         break;
-      case REWARD_LIGHTS_BLUE:
+      case REWARDS.BLUE:
         setLightToScene(BLUE);
         break;
-      case REWARD_LIGHTS_GREEN:
+      case REWARDS.GREEN:
         setLightToScene(GREEN);
         break;
-      case REWARD_LIGHTS_PINK:
-        setLightToScene(PINK);
-        break;
-      case REWARD_LIGHTS_PURPLE:
+      case REWARDS.PURPLE:
         setLightToScene(PURPLE);
         break;
-      case REWARD_LIGHTS_WHITE:
+      case REWARDS.WHITE:
         setLightToScene(WHITE);
         break
-      case REWARD_LIGHTS_OFF:
+      case REWARDS.OFF:
         turnOffLights();
         break;
-      case REWARD_DAB:
+      case REWARDS.DAB:
         switchToDabCamera();
-        break
+        break;
 
     }
   });
@@ -191,6 +200,56 @@ async function switchToDabCamera() {
   });
 }
 
+
+
+
+function toggleAllRewards() {
+  for (let item in REWARDS) {
+    setRewardEnabled(REWARDS[item], true, false);
+  }
+}
+
+function enableDisableAllRewards(doEnable) {
+  for (let item in REWARDS) {
+    setRewardEnabled(REWARDS[item], false, doEnable);
+  }
+}
+
+
+
+
+
+async function setRewardEnabled(rewardID, toggleReward, enabled) {
+  await apiClient.helix.users.getUserByName(process.env.TWITCH_USER).then(user => {
+    apiClient.helix.channelPoints.getCustomRewardById(user.id, rewardID).then(reward => {
+      var rewardPaused;
+      if (toggleReward) {
+        rewardPaused = !reward.isPaused;
+      }
+      else
+        rewardPaused = !enabled;
+
+      apiClient.helix.channelPoints.updateCustomReward(user.id, rewardID, { isPaused: rewardPaused });
+
+    }).catch();
+  }).catch();
+
+}
+
+
+/*async function createReward(){
+    await apiClient.helix.users.getUserByName(process.env.TWITCH_USER)
+  .then(user => {
+    apiClient.helix.channelPoints.createCustomReward(user.id,{
+      cost:300,
+      title:"Lights Out!"
+      })
+    .then(reward => {
+      console.log(reward.id);
+    }).catch();
+  }).catch();
+}*/
+/*
 function debugHue() {//used as a debug function to get hue scenes
   client.scenes.getAll()
     .then(scenes => {
@@ -200,30 +259,4 @@ function debugHue() {//used as a debug function to get hue scenes
         console.log();
       }
     });
-}
-
-async function toggleReward() {
-  await apiClient.helix.users.getUserByName("sr2610")
-  .then(user => {
-    apiClient.helix.channelPoints.getCustomRewardById(user.id, REWARD_DAB)
-    .then(reward => {
-      apiClient.helix.channelPoints.updateCustomReward(user.id,REWARD_DAB, {isPaused:!reward.isPaused});
-    }).catch();
-  }).catch();
-
-  return;
-}
-
-/*
-async function createReward(){
-    await apiClient.helix.users.getUserByName("sr2610")
-  .then(user => {
-    apiClient.helix.channelPoints.createCustomReward(user.id,{
-      cost:100,
-      title:"Test Reward"
-      })
-    .then(reward => {
-      console.log(reward.id);
-    }).catch();
-  }).catch();
 }*/
